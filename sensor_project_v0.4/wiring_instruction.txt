@@ -1,0 +1,22 @@
+ADXL345 - ESP32:
+
+VCC - 3.3V
+GND - GND
+SDA - 21
+SCL - 22
+
+BMP280 - ESP32:
+
+VCC - 3.3V
+GND - GND
+SDA - 21
+SCL - 22
+
+SD Adapter - ESP32:
+
+GND - GND
+VCC - VIN
+MISO - 19
+MOSI - 23
+SCK - 18
+CS - 4
