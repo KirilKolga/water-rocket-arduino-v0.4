@@ -101,7 +101,7 @@ void setup()
   masterCalibration(); // Perform the calibration of the sensors
 
   // Function to clean the SD card
-  // wipeSD(SD, "/", 10);
+  wipeSD(SD, "/", 10);
 }
 
 void loop() 
