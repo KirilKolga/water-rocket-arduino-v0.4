@@ -21,6 +21,9 @@
 #include <SD.h>
 #include <SPI.h>
 
+// Include libraries for servo motor
+#include <ESP32Servo.h>
+
 // Store global variables:
 
 const long SDSize = 16*pow(10, 9); // SD card size in bytes
@@ -97,6 +100,9 @@ void setup()
 
   // Setup BMP280 sensor
   BMP280Setup();
+
+  // Setup the servo motor
+  servoSetup();
 
   masterCalibration(); // Perform the calibration of the sensors
 
