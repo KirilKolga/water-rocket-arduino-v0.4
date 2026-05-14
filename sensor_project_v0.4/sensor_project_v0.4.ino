@@ -1,9 +1,10 @@
-// Include C++ libraries
+// Include standard C++ libraries
 #include <string>
 #include <cmath>
 #include <algorithm>
 #include <vector>
 #include <numeric>
+#include <cstdlib>
 
 // Include BLE libraries
 #include <BLEDevice.h>
@@ -11,39 +12,47 @@
 #include <BLEServer.h>
 #include <BLE2902.h>
 
-// Include libraries for sensors
+// Include libraries for the sensors
 #include <Wire.h>
 #include <Adafruit_Sensor.h>
 #include <Adafruit_ADXL345_U.h>
 #include <Adafruit_BMP280.h>
 
-// Include libraries for SD adapter
+// Include libraries for the SD adapter
 #include <SD.h>
 #include <SPI.h>
 
-// Include libraries for servo motor
+// Include libraries for the servo motor
 #include <ESP32Servo.h>
 
 // Store global variables:
 
 const long SDSize = 16*pow(10, 9); // SD card size in bytes
 
+// Servo
+Servo servo1; // Create servo object
+
 // BLE stuff
 
-bool BLEDeviceConnected = false; // Variable to check if another device is connected via BLE
+bool BLEDeviceConnected = false; // Variable to check if a client device is connected via BLE
 
 bool restartServerAdvertising = false; // Variable to check if server advertising is wanted to restart
 
-std::string BLECommand = "0"; // Variable to store the command sent via BLE (default 0)
+std::string BLECommand = "0"; // Variable to store the BLE command (default 0)
 
 // Data logging stuff
-unsigned long startTime; // Variable for time passed counting from setup initialization
+int dataLogIndex; // Variable to store the next datalog folder index
+
+unsigned long startTime; // Variable for the time passed counting from setup initialization
 
 File logFileADXL345; // Variable for file logging
 File logFileBMP280; // Variable for file logging
 
 unsigned long passedLogTime; // Time that has passed during datalog (goes by intervals of logInterval)
 const int logInterval = 10; // Interval in which data is logged (unit: ms)
+
+unsigned long passedLogFlushTime; // Time that has passed during datalog (goes by intervals of logSaveInterval)
+const int logFlushInterval = 1000; // Interval in which data is flushed to the memory.
 
 // Launch sequence stuff
 unsigned long passedCountdownTime;
@@ -66,7 +75,7 @@ double totalAccel; // Variable to store calculated total acceleration (can be ca
 double totalAccelZeroTerm = 0; // Variable to calibrate total acceleration
 
 std::vector<double> lastAccelValues; // Vector to store certain amount of previous acceleration values
-int accelIterations = 250; // How many previous values are stored
+int accelIterations = 25; // How many previous values are stored
 double lastAccelAverage = 0; // Variable to store the average of previous acceleration values
 
 // BMP280 stuff
@@ -78,7 +87,7 @@ double altitudeZeroTerm = 0; // Variable to calibrate the altitude
 
 std::vector<double> lastAltitudeValues1; // Vector to store certain amount of previous altitude values
 std::vector<double> lastAltitudeValues2; // Vector to store certain amount of altitude values even older than in vector1
-int altitudeIterations = 250; // How many previous values are stored (per vector)
+int altitudeIterations = 25; // How many previous values are stored (per vector)
 double lastAltitudeAverage1 = 0; // Variable to store the average of previous altitude values
 double lastAltitudeAverage2 = 0; // Variable to store the average of previous altitude values
 
@@ -87,7 +96,10 @@ double lastAltitudeAverage2 = 0; // Variable to store the average of previous al
 void setup() 
 {
   Serial.begin(115200); // Initialize the Serial monitor
-  delay(2000); // Wait 2s for the correct initialization of the Serial monitor
+  delay(2000); // Wait for 2s for the correct initialization of the Serial monitor
+
+  Wire.begin(21, 22);
+  Wire.setClock(400000);
 
   // Setup BLE communication
   BLESetup();
@@ -104,10 +116,11 @@ void setup()
   // Setup the servo motor
   servoSetup();
 
-  masterCalibration(); // Perform the calibration of the sensors
+  masterCalibration(); // Perform a calibration of the sensors
 
-  // Function to clean the SD card
-  // wipeSD(SD, "/", 10);
+  servoTest();
+
+  readFile("/dataLog1/bmp.csv");
 }
 
 void loop() 

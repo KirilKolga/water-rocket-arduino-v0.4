@@ -34,6 +34,13 @@ void readBLECommand()
     }
   }
 
+  else if (BLECommand == "wipeSD")
+  {
+    BLECommand = "OFF";
+    wipeSD(SD, "/", 10);
+    Serial.println("SD card wiped successfully.");
+  }
+
   // If command is instrumentCheck: perform a pre-flight check for instruments
   else if (BLECommand == "instrumentCheck")
   {
@@ -44,9 +51,9 @@ void readBLECommand()
   // If command is dataLog: start new datalogging session for sensor data
   else if (BLECommand == "dataLog")
   {
-    int index = getNextDataLogIndex(); // Get a new index for the dataLog folder
+    dataLogIndex = getNextDataLogIndex(); // Get a new index for the dataLog folder
 
-    String logFolderPath = "/dataLog" + String(index); // Store the path for the new dataLog folder in a String variable
+    String logFolderPath = "/dataLog" + String(dataLogIndex); // Store the path for the new dataLog folder in a String variable
 
     createDataLog(logFolderPath); // Create new dataLog folder on SD card
 
@@ -55,6 +62,7 @@ void readBLECommand()
 
     startTime = millis(); // Measure the time that has passed from setup initialization
     passedLogTime = 0; // Zero the logging session time (this way we can log data starting from 0s)
+    passedLogFlushTime = 0;
 
     masterCalibration();
 
@@ -83,9 +91,9 @@ void readBLECommand()
 
   else if (BLECommand == "launch")
   {
-    int index = getNextDataLogIndex(); // Get a new index for the dataLog folder
+    dataLogIndex = getNextDataLogIndex(); // Get a new index for the dataLog folder
 
-    String logFolderPath = "/dataLog" + String(index); // Store the path for the new dataLog folder in a String variable
+    String logFolderPath = "/dataLog" + String(dataLogIndex); // Store the path for the new dataLog folder in a String variable
 
     createDataLog(logFolderPath); // Create new dataLog folder on SD card
 
@@ -94,6 +102,7 @@ void readBLECommand()
 
     startTime = millis(); // Measure the time that has passed from setup initialization
     passedLogTime = 0; // Zero the logging session time (this way we can log data starting from 0s)
+    passedLogFlushTime = 0;
     passedCountdownTime = 0;
 
     masterCalibration();

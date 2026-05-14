@@ -227,6 +227,7 @@ void readSensorData()
   sensors_event_t event; 
   accel.getEvent(&event);
 
+  
   // Set raw acceleration data variables
   xAccel = event.acceleration.x;
   yAccel = event.acceleration.y;
@@ -240,7 +241,7 @@ void readSensorData()
   pressure = bmp.readPressure();
   altitude = bmp.readAltitude() - altitudeZeroTerm;
 
-
+  
   // Save certain amount of acceleration data in one vector
   if (lastAccelValues.size() < accelIterations)
   {
@@ -288,17 +289,106 @@ void readSensorData()
     double altitudeSum1 = accumulate(lastAltitudeValues1.begin(), lastAltitudeValues1.end(), 0);
     lastAltitudeAverage1 = altitudeSum1 / lastAltitudeValues1.size();
   }
+  
 }
 
+// Simulation function
+
+void readFileData(const String &path)
+{
+  if (!fileExists)
+  {
+    Serial.println("No such file as " + path);
+    while(1);
+  }
+
+  File dataFile = SD.open(path);
+
+  if (!dataFile)
+  {
+    Serial.println("Can't open the file " + path);
+    while(1);
+  }
+
+  int lineIndex = 0;
+  char line[128];
+
+  while (dataFile.available())
+  {
+    char c = dataFile.read();
+
+    if (c == '\n')
+    {
+      line[lineIndex] = '\0';
+      break;
+    }
+
+    line[lineIndex++] = c;
+  }
+  
+  char* token;
+
+  token = strtok(line, ",");
+
+  token = strtok(nullptr, ",");
+  temperature = atof(token);
+
+  token = strtok(nullptr, ",");
+  pressure = atof(token);
+
+  token = strtok(nullptr, ",");
+  altitude = atof(token);
+
+  Serial.println(altitude);
+}
+
+
+// FLIGHT LOOP
+
+char bufferBMP280[4096]; // Store data chunks in RAM using a data buffer and flush them to SD card when full. (Fills in ~1s)
+int bufferIndexBMP280 = 0; // The index tells where in the buffer to write the next data log
+
+char bufferADXL345[4096]; // Store data chunks in RAM using a data buffer and flush them to SD card when full. (Fills in ~1s)
+int bufferIndexADXL345 = 0; // The index tells where in the buffer to write the next data log
 
 void launchRunning()
 {
   unsigned long newTime = millis() - startTime; // Calculate the time passed from session initialization (null the time using startTime variable)
 
-  readSensorData(); // Read the sensors
+  // Data is logged to the files at intervals (logInterval)
+  if (newTime - passedLogTime >= logInterval) // Check if the new time interval has begun (passedLogTime is counted discretely at intervals: 1*logInterval, 2*logInterval, 3*logInterval...)
+  {
+    passedLogTime += logInterval; // Add passed interval to passedLogTime variable
 
-  // Perform launch countdown
-  if (newTime - passedCountdownTime >= 1000 && newTime <= 12000) // Count while the passed time is under 12s
+    readSensorData(); // Read the sensors
+
+    // Write the sensor values into the data buffers
+    bufferIndexBMP280 += snprintf(bufferBMP280 + bufferIndexBMP280, sizeof(bufferBMP280) - bufferIndexBMP280, "%lu,%.2f,%.2f,%.2f\n", newTime, temperature, pressure, altitude);
+
+    bufferIndexADXL345 += snprintf(bufferADXL345 + bufferIndexADXL345, sizeof(bufferADXL345) - bufferIndexADXL345, "%lu,%.2f,%.2f,%.2f,%.2f", newTime, xAccel, yAccel, zAccel, totalAccel);
+
+    // Flush the buffer data into the log files when they are nearly full.
+    // Also save the datafiles so the contents don't get lost in the case of power loss
+    if (bufferIndexBMP280 > sizeof(bufferBMP280) - 200)
+    {
+      logFileBMP280.write((const uint8_t*)bufferBMP280, bufferIndexBMP280);
+      bufferIndexBMP280 = 0; // Return the index to the start, so it writes over old data
+
+      logFileBMP280.flush(); // flush the data file, so it saves the contents
+      Serial.println("Flushed");
+    }
+
+    if (bufferIndexADXL345 > sizeof(bufferADXL345) - 200)
+    {
+      logFileADXL345.write((const uint8_t*)bufferADXL345, bufferIndexADXL345);
+      bufferIndexADXL345 = 0; // Return the index to the start, so it writes over old data
+
+      logFileADXL345.flush(); // flush the data file, so it saves the contents
+    }
+  }
+
+  // Perform launch countdown  
+  if (newTime - passedCountdownTime >= 1000 && newTime < 12000) // Count while the passed time is under 12s
   {
     passedCountdownTime += 1000; // Add passed interval (1s) to passed time
 
@@ -321,13 +411,6 @@ void launchRunning()
       pNotifyCharacteristic->notify();
     }
   }
-  
-  // Data is logged to the files at intervals (logInterval)
-  if (newTime - passedLogTime >= logInterval) // Check if the new time interval has begun (passedLogTime is counted discretely at intervals: 1*logInterval, 2*logInterval, 3*logInterval...)
-  {
-    passedLogTime += logInterval; // Add passed interval to passedLogTime variable
-    dataLog(newTime);
-  }
 
   // Eject the parachute manually when certain amount of time has passed
   if (newTime >= manualParachuteEjectionTime && parachuteEjected == false) ejectParachute();
@@ -344,6 +427,7 @@ void launchRunning()
     pNotifyCharacteristic->setValue(output.c_str());
     pNotifyCharacteristic->notify();
   }
+  
 
 }
 

@@ -76,6 +76,14 @@ void dataLogRunning()
   {
     passedLogTime += logInterval; // Add passed interval to passedLogTime variable
 
+    if (newTime - passedLogFlushTime >= logFlushInterval)
+    {
+      passedLogFlushTime += logFlushInterval;
+
+      logFileADXL345.flush();
+      logFileBMP280.flush();
+    }
+
     
     sensors_event_t event; // create an event for ADXL345
     accel.getEvent(&event);
